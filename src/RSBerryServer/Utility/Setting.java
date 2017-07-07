@@ -26,8 +26,9 @@ public class Setting
                     if (line.trim().isEmpty()) {
                         continue;
                     }
-                    String[] parts = line.split(" ");
-                    settings.put(parts[0], parts[1]);
+                    String keyy = line.substring(0, line.indexOf(" "));
+                    String value = line.substring(line.indexOf(" ") + 1);
+                    settings.put(keyy, value);
                 }
                 loaded = true;
             } catch (IOException ioe) {
