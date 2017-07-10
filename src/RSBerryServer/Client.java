@@ -1,10 +1,7 @@
 package RSBerryServer;
 
+import RSBerryServer.Except.*;
 import RSBerryServer.Model.Character;
-import RSBerryServer.Except.AlreadyLoggedIn;
-import RSBerryServer.Except.BadLogin;
-import RSBerryServer.Except.CharacterBanned;
-import RSBerryServer.Except.CharacterNotFound;
 import RSBerryServer.Handler.ClientHandler;
 import RSBerryServer.Legacy.Cryption;
 import RSBerryServer.Legacy.Stream;
@@ -31,25 +28,60 @@ public class Client
     private static final int RETURN_CODE_LOGIN_SERVER_OFFLINE = 8;
     private static final int RETURN_CODE_INVALID_WORLD = 10;
     private static final int RETURN_CODE_UPDATING = 14;
-    private static final int RETURN_CODE_ACCOUNT_REQUIRED = 20;
+    private static final int RETURN_CODE_INVALID_LOGIN_SERVER = 20;
+
+    public static final int PACKET_SIZES[] = {
+            0, 0, 0, 1, -1, 0, 0, 0, 0, 0, //0
+            0, 0, 0, 0, 8, 0, 6, 2, 2, 0,  //10
+            0, 2, 0, 6, 0, 12, 0, 0, 0, 0, //20
+            0, 0, 0, 0, 0, 8, 4, 0, 0, 2,  //30
+            2, 6, 0, 6, 0, -1, 0, 0, 0, 0, //40
+            0, 0, 0, 12, 0, 0, 0, 0, 8, 0, //50
+            0, 8, 0, 0, 0, 0, 0, 0, 0, 0,  //60
+            6, 0, 2, 2, 8, 6, 0, -1, 0, 6, //70
+            0, 0, 0, 0, 0, 1, 4, 6, 0, 0,  //80
+            0, 0, 0, 0, 0, 3, 0, 0, -1, 0, //90
+            0, 13, 0, -1, 0, 0, 0, 0, 0, 0,//100
+            0, 0, 0, 0, 0, 0, 0, 6, 0, 0,  //110
+            1, 0, 6, 0, 0, 0, -1, 0, 2, 6, //120
+            0, 4, 6, 8, 0, 6, 0, 0, 0, 2,  //130
+            0, 0, 0, 0, 0, 6, 0, 0, 0, 0,  //140
+            0, 0, 1, 2, 0, 2, 6, 0, 0, 0,  //150
+            0, 0, 0, 0, -1, -1, 0, 0, 0, 0,//160
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //170
+            0, 8, 0, 3, 0, 2, 0, 0, 8, 1,  //180
+            0, 0, 12, 0, 0, 0, 0, 0, 0, 0, //190
+            2, 0, 0, 0, 0, 0, 0, 0, 4, 0,  //200
+            4, 0, 0, 0, 7, 8, 0, 0, 10, 0, //210
+            0, 0, 0, 0, 0, 0, -1, 0, 6, 0, //220
+            1, 0, 0, 0, 6, 0, 6, 8, 1, 0,  //230
+            0, 4, 0, 0, 0, 0, -1, 0, -1, 4,//240
+            0, 0, 6, 6, 0, 0, 0            //250
+    };
 
     public Socket socket = null;
     private InputStream in = null;
     private OutputStream out = null;
     private Stream inStream = null;
     private Stream outStream = null;
-    private int character_slot = -1;
+    public int slot = 0;
     private int buffer_size = 1000000;
-    private Character character = null;
+    public Character character = null;
     private Cryption inStreamDecryption = null;
     private Cryption outStreamDecryption = null;
+    private int packet_type = 0;
+    private int packet_size = 0;
 
-    public Client(Socket s, int slot)
+    public Client(Socket s, int slots)
     {
         socket = s;
-        character_slot = slot;
+        slot = slots;
+    }
 
-        System.out.println("Connection accepted from ");
+    public void run()
+    {
+
+        System.out.println("Connection accepted from " + socket.getRemoteSocketAddress().toString() + " in slot " + slot);
         inStream = new Stream(new byte[buffer_size]);
         inStream.currentOffset = 0;
         outStream = new Stream(new byte[buffer_size]);
@@ -128,16 +160,16 @@ public class Client
             int tmp = inStream.readUnsignedByte();
 
             if (login_encrypt_packet_size != tmp) {
-                ClientHandler.kick(slot);
                 System.out.println("Encrypted packet data is not what they said it would be.");
+                ClientHandler.kick(slot);
                 return;
             }
 
             tmp = inStream.readUnsignedByte();
 
             if (tmp != 10) {
-                ClientHandler.kick(slot);
                 System.out.println("Expected a packet ID of 10");
+                ClientHandler.kick(slot);
                 return;
             }
 
@@ -186,7 +218,7 @@ public class Client
                 ClientHandler.kick(slot);
                 return;
             } catch (CharacterNotFound cnf) {
-                out.write(RETURN_CODE_ACCOUNT_REQUIRED);
+                out.write(RETURN_CODE_BAD_LOGIN);
                 ClientHandler.kick(slot);
                 return;
             }
@@ -202,8 +234,8 @@ public class Client
             out.write(0);
 
         } catch (IOException ioe) {
-            ClientHandler.kick(slot);
             System.out.println("Unknown error");
+            ClientHandler.kick(slot);
             return;
         }
     }
@@ -227,14 +259,50 @@ public class Client
         parseIncomingPackets();
     }
 
-    public void parseIncomingPackets()
+    private void parseIncomingPackets()
     {
         try {
-            int available = in.available();
-            if (available == 0) {
-                return;
+            if (in == null) return;
+
+            int available_packet = in.available();
+            if (available_packet == 0) return;
+
+            if (packet_type == -1) {
+                packet_type = in.read() & 0xff;
+                if (inStreamDecryption != null)
+                    packet_type = packet_type - inStreamDecryption.getNextKey() & 0xff;
+                packet_size = PACKET_SIZES[packet_type];
+                available_packet--;
             }
-            int packet_type = in.read() & 0xff;
+            if (packet_size == -1) {
+                if (available_packet > 0) {
+                    // this is a variable size packet, the next byte containing the length of said
+                    packet_size = in.read() & 0xff;
+                    available_packet--;
+                } else return;
+            }
+            if (available_packet < packet_size) return;    // packet not completely arrived here yet
+
+            fillInStream(packet_size);
+
+            int i;
+            int junk1;
+            int junk2;
+            int junk3;
+
+            switch (packet_type) {
+                case 0:
+                    // Idle timer
+                    break;
+
+                case 202:
+                    // Logout packet
+                    break;
+
+                default:
+                    System.out.println("Unknown packet id '" + packet_type + "'.");
+                    break;
+            }
 
         } catch (IOException ioe) {
             //
@@ -243,6 +311,19 @@ public class Client
 
     public void login(String username, String password) throws AlreadyLoggedIn, BadLogin, CharacterNotFound, CharacterBanned
     {
+        int i = ClientHandler.getClientByUsername(username);
+        if (i > -1) {
+            throw new AlreadyLoggedIn("That character is already logged in");
+        }
         character = Character.readUsingCredentials(username, password);
+    }
+
+    public boolean isLoggedIn()
+    {
+        if (character == null) {
+            return false;
+        }
+
+        return true;
     }
 }

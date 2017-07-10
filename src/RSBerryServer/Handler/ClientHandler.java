@@ -31,7 +31,8 @@ public class ClientHandler
     public static Client request(Socket socket) throws NoEmptySlot
     {
         int next_slot = nextAvailableSlot();
-        clients[next_slot] = new Client(socket, next_slot);
+        Client client = new Client(socket, next_slot);
+        clients[next_slot] = client;
         return clients[next_slot];
     }
 
@@ -48,10 +49,27 @@ public class ClientHandler
     public static void kick(int slot)
     {
         try {
+//            System.out.println(slot);
+//            System.out.println(clients[slot]);
             clients[slot].socket.close();
             clients[slot] = null;
         } catch (IOException ioe) {
-            //
+//
         }
+    }
+
+    public static int getClientByUsername(String username)
+    {
+        for (int i = 0; i < clients.length; i++) {
+            if (clients[i] == null) {
+                continue;
+            }
+            if (clients[i].isLoggedIn()) {
+                if (clients[i].character.getUsername() == username) {
+                    return i;
+                }
+            }
+        }
+        return -1;
     }
 }

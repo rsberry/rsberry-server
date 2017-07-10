@@ -38,6 +38,7 @@ public class Server implements Runnable
                 socket.setTcpNoDelay(true);
                 try {
                     Client client = ClientHandler.request(socket);
+                    client.run();
                 } catch (NoEmptySlot ncs) {
                     // If there're no slots available, close the connection.
                     System.out.println("There're no free slots for new connections");
