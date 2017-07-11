@@ -34,20 +34,32 @@ public class Character
 
     public static Character read(int id) throws CharacterNotFound
     {
+        // Create an empty instance of character
         Character instance = new Character();
 
+        // Get the connection
         Connection connection = Database.getInstance();
         try {
+            // Prepare a statement, no SQL injection here mother fuckers
             PreparedStatement statement = connection.prepareStatement("SELECT * FROM `users` WHERE `id` = ? LIMIT 1;");
+            // Set the id that we want to look up on
             statement.setInt(1, id);
+            // Execute the statement
             statement.execute();
+            // Pull the results out
             ResultSet results = statement.getResultSet();
+            // Go to the last row
             results.last();
+            // Get the row number
             int count = results.getRow();
+            // If it's 0, there are no rows, so the character doesn't exist
             if (count < 1) {
+                // Bitch and moan about it
                 throw new CharacterNotFound("Character with ID '" + id + "' doesn't exist.");
             }
+            // Otherwise, go to the first row
             results.first();
+            // Start putting the data into the object
             instance.id = results.getInt("id");
             instance.username = results.getString("username");
             instance.password = results.getString("password");
@@ -69,6 +81,7 @@ public class Character
             instance.look_4 = results.getInt("look_4");
             instance.look_5 = results.getInt("look_5");
         } catch (SQLException sqle) {
+            // If the SQL is malformed, fall over here
             System.out.println(sqle.getMessage());
             System.exit(1);
         }
@@ -78,32 +91,54 @@ public class Character
 
     public static Character readUsingCredentials(String username, String password) throws CharacterNotFound, CharacterBanned, BadLogin
     {
+        // Create a holder
         Character character = null;
+
+        // Get the connection
         Connection connection = Database.getInstance();
         try {
+            // Prepare a statement
             PreparedStatement statement = connection.prepareStatement("SELECT `id` FROM `users` WHERE `username` = ? LIMIT 1;");
+            // Set the username we're looking up on
             statement.setString(1, username);
+            // Execute the statement
             statement.execute();
+            // Get the results
             ResultSet results = statement.getResultSet();
+            // Go to the last row
             results.last();
+            // Get the row number
             int count = results.getRow();
+            // Row number is 0 so there isn't a user with that name
             if (count < 1) {
+                // User basically logging in with the wrong username. Bubble this exception up so it can be handled later
                 throw new CharacterNotFound("Character with username '" + username + "' doesn't exist.");
             }
+            // Go to the first row
             results.first();
 
+            // Read the character by it's id
             character = read(results.getInt("id"));
+
+            // Is the character banned?
             if (character.isBanned()) {
+                // Bubble the exception up... further up the code, tell them to fuck off
                 throw new CharacterBanned("This character has been banned.");
             }
 
+            // Check if the password they gave us matches the hash we stored
+            // I'm using bcrypt because I want to create a PHP control panel for this later and bcrypt is
+            // best practice over in that land of superior programming languages.
             if (!BCrypt.checkpw(password, character.getPassword())) {
                 throw new BadLogin("Bad username/password combination");
             }
 
+            // Return the object
             return character;
         } catch (SQLException sqle) {
+            // If the SQL is malformed, throw a wobbly and kill the game
             System.out.println(sqle.getMessage());
+            // TODO Probably want to throw an exception here so we can save games before everyone is booted
             System.exit(1);
         }
 
@@ -130,6 +165,7 @@ public class Character
 
     public boolean isMod()
     {
+        // If you are an admin you are also a mod
         if (rights >= 1) {
             return true;
         }
