@@ -152,7 +152,9 @@ public class Character
 
     public String getPassword()
     {
-        return password;
+        // We have to do this because the people at bcrypt fucked up
+        String tmp_password = password.replace("$2y", "$2a");
+        return tmp_password;
     }
 
     public boolean isAdmin()

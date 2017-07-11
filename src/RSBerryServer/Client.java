@@ -88,6 +88,7 @@ public class Client
     public Character character = null; // The character they're logged in as
     private int packet_type = 0; // Latest packet type
     private int packet_size = 0; // Latest packet size
+    public boolean initialised = false;
 
     public Client(Socket s, int slots)
     {
@@ -384,19 +385,39 @@ public class Client
 
     public void login(String username, String password) throws AlreadyLoggedIn, BadLogin, CharacterNotFound, CharacterBanned
     {
+        System.out.println("Logging in with " + username + " " + password);
+        // See if the user is already logged in
         int i = ClientHandler.getClientByUsername(username);
         if (i > -1) {
+            // They are, which means they didn't lo0g out properly.
             throw new AlreadyLoggedIn("That character is already logged in");
         }
+        // Otherwise set this client's character.
         character = Character.readUsingCredentials(username, password);
     }
 
     public boolean isLoggedIn()
     {
+        // Basically, if we've assigned a character to this client, they're logged in
         if (character == null) {
             return false;
         }
 
         return true;
+    }
+
+    public void initialise()
+    {
+        // Send membership and player id first
+        outStream.createFrame(249);
+        if (character.isMember()) {
+            outStream.writeByteA(1);
+        } else {
+            outStream.writeByteA(0);
+        }
+        outStream.writeWordBigEndianA(slot);
+
+        // Lastly flag as initialised
+        initialised = true;
     }
 }

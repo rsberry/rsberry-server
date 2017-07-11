@@ -15,6 +15,7 @@ package RSBerryServer.Utility;
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import java.io.UnsupportedEncodingException;
+
 import java.security.SecureRandom;
 
 /**
@@ -58,7 +59,7 @@ import java.security.SecureRandom;
  * 10, and the valid range is 4 to 30.
  *
  * @author Damien Miller
- * @version 0.2
+ * @version 0.4
  */
 public class BCrypt {
     // BCrypt parameters

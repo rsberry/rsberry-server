@@ -25,6 +25,7 @@ public class ClientHandler
      */
     public void process()
     {
+        // Do all the imcoming data first, make decisions etc...
         // For each slot
         for (int i = 0; i < Setting.getMaxPlayers(); i++) {
             // If the slot is empty
@@ -33,7 +34,20 @@ public class ClientHandler
             }
 
             // Process the client in the slot
+            System.out.println("Processing client " + i);
             clients[i].process();
+        }
+
+        // Only once all the "thinking" is done, do we send stuff back
+        // For each player
+        for (int i = 0; i < Setting.getMaxPlayers(); i++) {
+            // If the slot is empty
+            if (clients[i] == null) {
+                continue;
+            }
+            if (!clients[i].initialised && clients[i].isLoggedIn()) {
+                clients[i].initialise();
+            }
         }
     }
 
