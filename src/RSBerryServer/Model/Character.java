@@ -153,8 +153,8 @@ public class Character
     public String getPassword()
     {
         // We have to do this because the people at bcrypt fucked up
-        String tmp_password = password.replace("$2y", "$2a");
-        return tmp_password;
+        // When PHP did it, changing the prefix was stupid. But when *they* did it
+        return password.replace("$2y", "$2a");
     }
 
     public boolean isAdmin()
